@@ -33,6 +33,7 @@
 /*
  * Macro-instructions used to manage fragments
  */
+
 #define EXT2_MIN_FRAG_SIZE		1024
 #define	EXT2_MAX_FRAG_SIZE		4096
 #define EXT2_MIN_FRAG_LOG_SIZE		  10
@@ -44,14 +45,14 @@
  */
 struct ext2_group_desc
 {
-	unsigned int	bg_block_bitmap;		/* Blocks bitmap block */
-	unsigned int	bg_inode_bitmap;		/* Inodes bitmap block */
-	unsigned int	bg_inode_table;		/* Inodes table block */
-	unsigned short	bg_free_blocks_count;	/* Free blocks count */
-	unsigned short	bg_free_inodes_count;	/* Free inodes count */
-	unsigned short	bg_used_dirs_count;	/* Directories count */
-	unsigned short	bg_pad;
-	unsigned int	bg_reserved[3];
+    unsigned int	bg_block_bitmap;		/* Blocks bitmap block */
+    unsigned int	bg_inode_bitmap;		/* Inodes bitmap block */
+    unsigned int	bg_inode_table;		/* Inodes table block */
+    unsigned short	bg_free_blocks_count;	/* Free blocks count */
+    unsigned short	bg_free_inodes_count;	/* Free inodes count */
+    unsigned short	bg_used_dirs_count;	/* Directories count */
+    unsigned short	bg_pad;
+    unsigned int	bg_reserved[3];
 };
 
 #define EXT2_S_IFREG	0x8000	/* regular file */
