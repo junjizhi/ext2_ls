@@ -79,6 +79,41 @@ void print_superblock(char* disk_img){
 	return;
     }
 
+    /* read the first i_bloc, i.e., data block */
+    unsigned int data_block = root_inode->i_block[0];
+    unsigned int offset = data_block * EXT2_BLOCK_SIZE; 
+    lseek(fd, offset, SEEK_SET);
+    read_size = sizeof(struct ext2_dir_entry);
+    
+    int target_inode_number = 2;
+    /* read all the directory entries */
+    while(1){
+	read_size = sizeof(struct ext2_dir_entry);
+	char* buf3 = malloc(sizeof(struct ext2_dir_entry));
+	struct ext2_dir_entry * dir_entry = (struct ext2_dir_entry*) buf3;
+	if ((ret = read(fd, buf3, read_size)) < 1){
+	    printf("Failed to read from fd\n");
+	    return;
+	}
+	/* the file name is in the following bytes */
+        read_size = dir_entry->rec_len - read_size ;
+	/* lseek(fd, offset, SEEK_CUR); */
+	char* buf4 = malloc(read_size);
+	read(fd, buf4, read_size);	
+	/* to see if we exhaust all entries. 
+	   if we read something like this: {inode = 11, rec_len = 12, name_len = 513, name = . }, then it means it is not in the root node any more. Should exit the loop
+	 may NOT be the best way to do this*/
+       if(strcmp(buf4, ".") == 0 && dir_entry->inode != target_inode_number){
+	   break;		/* exit the loop */
+	   free(buf3);
+	   free(buf4);
+	    }
+	printf("{inode = %u, rec_len = %u, name_len = %u, name = %s}\n",
+	       dir_entry->inode, dir_entry->rec_len, dir_entry->name_len,
+	       buf4);
+	free(buf3);
+	free(buf4);
+    }
     /* free(buf); */
 }
 
