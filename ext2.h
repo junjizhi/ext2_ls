@@ -59,7 +59,6 @@ struct ext2_group_desc
 #define EXT2_S_IFDIR	0x4000	/* directory */
 
 
-
 /*
  * Structure of an inode on the disk
  */
