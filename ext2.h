@@ -14,7 +14,8 @@
  *  Copyright (C) 1991, 1992  Linus Torvalds
  */
 
-
+#ifndef _EXT2_H_
+#define _EXT2_H_
 
 /*
  * Special inode numbers
@@ -55,6 +56,7 @@ struct ext2_group_desc
     unsigned int	bg_reserved[3];
 };
 
+#define EXT2_S_UNKNOWN  0x001
 #define EXT2_S_IFREG	0x8000	/* regular file */
 #define EXT2_S_IFDIR	0x4000	/* directory */
 
@@ -216,6 +218,5 @@ enum {
 	EXT2_FT_MAX
 };
 
-
-
+#endif
 
