@@ -125,70 +125,57 @@ dir_entry_list_t* read_inode(int inode_no, int* is_regular_file){
 	unsigned int data_block = inode->i_block[i];
 	unsigned int offset = data_block * EXT2_BLOCK_SIZE; 
 	lseek(fd, offset, SEEK_SET);
-	read_size = sizeof(struct ext2_dir_entry);
 
-	int target_inode_number = inode_no;
-	int read_all_entries = 0;
-	/* read all the directory entries */
-	while(!read_all_entries){
+	char* block = malloc( EXT2_BLOCK_SIZE );
+	/* read a whole block */
+	if( read(fd, block, EXT2_BLOCK_SIZE) == EXT2_BLOCK_SIZE ){
+	    int block_offset = 0;
 	    unsigned int read_inode;
 	    unsigned short rec_len;
 	    unsigned char name_len;
-	    unsigned char file_type;
-	    ret = read(fd, &read_inode, sizeof(unsigned int));
-	    ret = read(fd, &rec_len, sizeof(unsigned short));
-	    ret = read(fd, &name_len, sizeof(unsigned char));
-	    ret = read(fd, &file_type, sizeof(unsigned char));
-	    
-	    if (rec_len >= MAX_REC_LEN) /* if this is the last entry in the list */
-		read_all_entries = 1;
+	    unsigned char file_type;	  	    
 
-	    int name_field_size = rec_len - sizeof(struct ext2_dir_entry) ;
-	    struct ext2_dir_entry * dir_entry = (struct ext2_dir_entry*)malloc(rec_len);
-	    if ((ret = read(fd, dir_entry->name, name_field_size)) < 1){
-		printf("Failed to read from fd\n");
-		return;
-	    }
+	    while ( block_offset < EXT2_BLOCK_SIZE ) {
+		unsigned int old = block_offset; 
+		read_inode = *((unsigned int*) (block + block_offset));
+		block_offset += sizeof(unsigned int);
+		rec_len = *((unsigned short*) (block + block_offset));
+		block_offset += sizeof(unsigned short);
+		name_len = *((unsigned char*) (block + block_offset));
+		block_offset += sizeof(unsigned char);
+		file_type = *((unsigned char*) (block + block_offset));
+		block_offset += sizeof(unsigned char);
+		
+		struct ext2_dir_entry * dir_entry = (struct ext2_dir_entry*)malloc(rec_len);	      
 
-	    (dir_entry->name)[name_len] = '\0';
-	    /* to see if we exhaust all entries. 
-	       if we read something like this: {inode = 11, rec_len = 12, name_len = 513, name = . }, then it means it is not in the root node any more. Should exit the loop
-	       TODO: may NOT be the best way to do this*/
-	    ret = (strcmp(dir_entry->name, ".") == 0);
-#if DEBUG
-	    if (ret == 1){
-		printf("ret == 1, read_inode is %d, target_inode_number = %d\n", read_inode, target_inode_number);
-	    }
-#endif
-	    if( (ret && read_inode != target_inode_number)){
-		free(dir_entry);
-		break;		/* exit the loop */		
-	    }
-	    
-	    if(dir_entry){
-		dir_entry->inode = read_inode;
-		dir_entry->rec_len = rec_len;
-		dir_entry->name_len = (unsigned short)name_len;
-	    }
+		if(dir_entry){
+		    dir_entry->inode = read_inode;
+		    dir_entry->rec_len = rec_len;
+		    dir_entry->name_len = (unsigned short)name_len;
+		    strncpy(dir_entry->name, (block + block_offset), name_len); /* copy the name */
+		    (dir_entry->name)[name_len] = '\0';
+		}
 #if DEBUG	       
-	    printf("{inode = %u, rec_len = %u, name_len = %u, name = %s}\n",
-		   dir_entry->inode, dir_entry->rec_len, dir_entry->name_len,
-		   dir_entry->name);
+		printf("{inode = %u, rec_len = %u, name_len = %u, name = %s}\n",
+		       dir_entry->inode, dir_entry->rec_len, dir_entry->name_len,
+		       dir_entry->name);
 #endif
-	    /* add the entry to result */
-	    dir_entry_list_t* new_entry = (dir_entry_list_t*) malloc(sizeof(dir_entry_list_t));
-	    new_entry->e = dir_entry;		
-	    /* new_entry->list = NULL; */
-	    /* if it is new, then simply initialize it */
-	    if ( entries == NULL ){
+       
+		/* add the entry to result */
+		dir_entry_list_t* new_entry = (dir_entry_list_t*) malloc(sizeof(dir_entry_list_t));
+		new_entry->e = dir_entry;		
+		/* if it is new, then simply initialize it */
+		if( entries == NULL ){
 		entries = new_entry;
 		INIT_LIST_HEAD(&(entries->list));
 	    }else{		
 		list_add_tail(&(new_entry->list), &(entries->list));
 	    }
-	    /* free(dir_entry->name); */
-	    /* free(buf3); */
-	}   /* end of while loop */
+		/* free(dir_entry->name); */
+		/* free(buf3); */
+		block_offset = old + rec_len;
+	    }   /* end of while loop */
+	    }
 	/* free(buf); */
 	i++;
     }
@@ -220,12 +207,13 @@ dir_entry_list_t* read_root_entry_list(){
 
 void print_dir(struct ext2_inode* inode){
     int n = -1;
-    printf("Total: %d\n", n);
+    printf("total %d\n", n);
+
+    
 }
 
 void print_file(struct ext2_inode* inode){
-    int n = 1;
-    printf("Total: %d\n", n);    
+   
 }
 
 /* return the file type of an inode */
