@@ -150,6 +150,7 @@ dir_entry_list_t* read_inode(int inode_no, int* is_regular_file){
 		return;
 	    }
 
+	    (dir_entry->name)[name_len] = '\0';
 	    /* to see if we exhaust all entries. 
 	       if we read something like this: {inode = 11, rec_len = 12, name_len = 513, name = . }, then it means it is not in the root node any more. Should exit the loop
 	       TODO: may NOT be the best way to do this*/
@@ -268,6 +269,7 @@ void ls(char* path){
     }
 }
  
+
 int get_inode_no(char* path){
     int i, n = -1;
     int ret = -1; 
@@ -284,7 +286,7 @@ int get_inode_no(char* path){
 	dir_entry_list_t* tmp; 
 
 	list_for_each_entry(tmp, &current_entry_list->list, list){
-	    if ( strncmp(tmp->e->name, splits[i], tmp->e->name_len) == 0 ){
+	    if ( strcmp(tmp->e->name, splits[i]) == 0 ){
 		found_inode = tmp->e->inode;
 		int is_regular_file = 0 ;
 		/* found, then update the current entry list*/
@@ -292,6 +294,7 @@ int get_inode_no(char* path){
 	    /* if it is a regular file, then */
 		if( tmp == NULL ){		    
 		    assert(is_regular_file); /* invalid combination */
+		    /* found_inode = -1; */
 		}else{
 		    current_entry_list = tmp2;
 		}		  
