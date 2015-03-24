@@ -31,31 +31,35 @@ typedef struct {
 
 typedef struct {
     int fd;
-    /* char* name; */
+    struct ext2_group_desc* egd; 
+    struct ext2_super_block* sb; 
     unsigned int inode_table_address;
 } Path_info;
 
-void ls(char* path);
-
 Path_info g_info;
 void _init_ext2(char*);
+void _exit_ext2();
+void ext2_ls(char* path);
 
-unsigned int read_inode_table_address(int fd);
+
+void read_metadata(int fd);
 /* init all the path info  */
 void _init_ext2(char* disk_img)
 {
     g_info.fd = open(disk_img, O_RDONLY);
-    g_info.inode_table_address = read_inode_table_address(g_info.fd);
+    read_metadata(g_info.fd);
 }
 
 void _exit_ext2()
 {
+    free(g_info.egd);
+    free(g_info.sb);
     close(g_info.fd);
 }
 
 struct ext2_inode* get_inode(int inode_no);
 
-unsigned int read_inode_table_address(int fd){
+void read_metadata(int fd){
 
     int ret = -1;
     char* buf = malloc(sizeof(struct ext2_super_block));
@@ -86,12 +90,9 @@ unsigned int read_inode_table_address(int fd){
 	return;
     }
     /* look for the inode table block */
-    unsigned int inode_table_block_addr = (egd->bg_inode_table) * EXT2_BLOCK_SIZE;
-#if DEBUG
-    printf("block bitmap is %u \n",egd->bg_block_bitmap);
-    printf("inode_table_block_addr is %u \n", inode_table_block_addr);
-#endif    
-    return inode_table_block_addr;
+    g_info.inode_table_address = (egd->bg_inode_table) * EXT2_BLOCK_SIZE;    
+    g_info.egd = egd;
+    g_info.sb = sb;
 }
 
 /* based from the inode_table_block_addr, read the content from inode */
@@ -269,7 +270,7 @@ char get_file_type_char(struct ext2_inode* inode){
     return type;
 }
 
-void ls(char* path){
+void ext2_ls(char* path){
     int i, n = -1;
     int ret = -1;
     int is_regular_file = 0 ;
@@ -335,4 +336,36 @@ struct ext2_inode* get_inode(int inode_no){
 	exit(0);
     }   
     return inode;
+}
+
+
+/* read a block in the disk */
+char* read_block(unsigned int block_no){
+    char* block = malloc(EXT2_BLOCK_SIZE);
+    if ( block ){
+	int offset = block_no * EXT2_BLOCK_SIZE;      
+	lseek(g_info.fd, offset, SEEK_SET);
+	if (read(g_info.fd, block, EXT2_BLOCK_SIZE) != EXT2_BLOCK_SIZE){ /* if not read the whole block */
+	    free(block);
+	    return NULL;
+	}
+    }
+    return block;       
+}
+
+/* read group desc struct and allocate a new inode number */
+unsigned int allocate_inode(){
+    unsigned int ret = -1;
+    unsigned int inode_bitmap_block = g_info.egd->bg_inode_bitmap; 
+    char* bitmap = read_block(inode_bitmap_block); 
+    if (bitmap){
+	
+    }
+    return ret; 
+}
+
+unsigned int allocate_data_block(){
+    unsigned int ret = -1;
+
+    return ret; 
 }

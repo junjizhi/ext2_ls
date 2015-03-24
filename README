@@ -1,1 +1,17 @@
-==
+# Introduction
+A simplified version of ls and mkdir implementation on ext2 file system. 
+
+# Assumptions
+
+# Notes
+1. The print out of *ext2_ls* is not as nicely formatted as an usual
+*ls* does. It needs work on *print_file* function.
+2. *ext2_ls* does not support the doubly or triply i_block links.
+3. There might be memory leak problems in the program. Probably due to
+missing free() on the malloc'd pointers. 
+4. ext2_mkdir only takes for absolute path as the parameters. 
+
+# Credits
+1. The implementation is mostly developed from an Operating System
+Course assignment. The instructor Karen Raid designed the assignment and wrote a
+detailed helpful specificiation for this program. 

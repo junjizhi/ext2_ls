@@ -10,6 +10,6 @@ ext2_ls: This program takes two command line arguments. The first is the name of
 
 int main(int argc, char* argv[]){    
     _init_ext2(argv[1]);
-    ls(argv[2]);
+    ext2_ls(argv[2]);
     _exit_ext2();
 }
