@@ -21,7 +21,7 @@ ext2_ls: This program takes two command line arguments. The first is the name of
 #define IMODE_TYPE_MASK 0xF000
 #define MAX_REC_LEN 980
 
-#define DEBUG 0
+#define DEBUG 1
 
 /* ext2 directory entry list */
 typedef struct {
@@ -52,8 +52,8 @@ void _init_ext2(char* disk_img)
 
 void _exit_ext2()
 {
-    free(g_info.egd);
-    free(g_info.sb);
+    /* free(g_info.egd); */
+    /* free(g_info.sb); */
     close(g_info.fd);
 }
 
@@ -356,7 +356,7 @@ char* read_block(unsigned int block_no){
 int is_zero( unsigned int bits, unsigned int pos) {
     assert ( pos >=0 && pos < 32 ); 
     
-    unsigned int mask = 1 << (32 - pos - 1);
+    unsigned int mask = 1 << (pos);
     if (! (mask & bits) ) 
 	return 1;
     else	
@@ -398,7 +398,6 @@ unsigned int find_free_data_block(char* bitmap){
     }
     return ERR_RET;
 }
-
 
 /* read group desc struct and allocate a new inode number */
 unsigned int allocate_inode(){
