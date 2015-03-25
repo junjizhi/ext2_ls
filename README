@@ -4,6 +4,7 @@ A simplified version of ls and mkdir implementation on ext2 file system.
 # Assumptions
 
 # Notes
+0. The program only works in 64bit machine. It assumes the int type is 32bit. 
 1. The print out of *ext2_ls* is not as nicely formatted as an usual
 *ls* does. It needs work on *print_file* function.
 2. *ext2_ls* does not support the doubly or triply i_block links.

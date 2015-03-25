@@ -353,19 +353,71 @@ char* read_block(unsigned int block_no){
     return block;       
 }
 
+int is_zero( unsigned int bits, unsigned int pos) {
+    assert ( pos >=0 && pos < 32 ); 
+    
+    unsigned int mask = 1 << (32 - pos - 1);
+    if (! (mask & bits) ) 
+	return 1;
+    else	
+	return 0; 
+}    
+
+
+/* TODO: assuming the unsigned int is 32-bit */
+unsigned int find_free_inode(char* bitmap){
+    if(bitmap){
+	unsigned int found = ERR_RET; 
+	int i;
+	for (i = EXT2_GOOD_OLD_FIRST_INO; i < EXT2_MAX_INO; i++){
+	    unsigned offset = (i / 32) * 4; /* 32 bits is 4 bytes, so the offset is multiple of 4 bytes */
+	    unsigned bits = *((unsigned int*) (bitmap + offset));
+	    if ( is_zero(bits, i % 32) ){
+		found = i + 1; 
+		break;
+	    }
+	}
+	return found; 
+    }
+    return ERR_RET;
+}
+
+unsigned int find_free_data_block(char* bitmap){
+    if(bitmap){
+	unsigned int found = ERR_RET; 
+	int i;
+	for (i = 0; i < EXT2_MAX_BLOCKS; i++){
+	    unsigned offset = (i / 32) * 4; /* 32 bits is 4 bytes, so the offset is multiple of 4 bytes */
+	    unsigned bits = *((unsigned int*) (bitmap + offset));
+	    if ( is_zero(bits, i % 32) ){
+		found = i + 1; 
+		break;
+	    }
+	}
+	return found; 
+    }
+    return ERR_RET;
+}
+
+
 /* read group desc struct and allocate a new inode number */
 unsigned int allocate_inode(){
     unsigned int ret = -1;
     unsigned int inode_bitmap_block = g_info.egd->bg_inode_bitmap; 
     char* bitmap = read_block(inode_bitmap_block); 
     if (bitmap){
-	
+	ret = find_free_inode(bitmap);
     }
     return ret; 
 }
 
 unsigned int allocate_data_block(){
-    unsigned int ret = -1;
 
+    unsigned int ret = -1;
+    unsigned int block_bitmap_block = g_info.egd->bg_block_bitmap; 
+    char* bitmap = read_block(block_bitmap_block); 
+    if (bitmap){
+	ret = find_free_data_block(bitmap);
+    }
     return ret; 
 }

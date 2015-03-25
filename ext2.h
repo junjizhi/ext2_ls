@@ -17,6 +17,8 @@
 #ifndef _EXT2_H_
 #define _EXT2_H_
 
+#define ERR_RET -1
+
 /*
  * Special inode numbers
  */
@@ -26,9 +28,12 @@
 #define EXT2_UNDEL_DIR_INO	 6	/* Undelete directory inode */
 
 #define EXT2_GOOD_OLD_FIRST_INO	11
+#define EXT2_MAX_INO 32
 
 #define EXT2_BLOCK_SIZE     1024
 #define	EXT2_ADDR_PER_BLOCK EXT2_BLOCK_SIZE / sizeof (unsigned int))
+
+#define EXT2_MAX_BLOCKS 128
 
 
 /*
