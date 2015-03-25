@@ -35,6 +35,7 @@
 
 #define EXT2_MAX_BLOCKS 128
 
+#define EXT2_IBLOCK_COUNT 15
 
 /*
  * Macro-instructions used to manage fragments
@@ -96,7 +97,7 @@ struct ext2_inode {
 	unsigned int	i_blocks;	/* Blocks count IN DISK SECTORS*/
 	unsigned int	i_flags;	/* File flags */
     unsigned int    osd1;		/* OS dependent 1 */
-	unsigned int	i_block[15];/* Pointers to blocks */
+	unsigned int	i_block[EXT2_IBLOCK_COUNT];/* Pointers to blocks */
     unsigned int  i_generation;   /* File version (for NFS) */
     unsigned int  i_file_acl;     /* File ACL */
     unsigned int  i_dir_acl;      /* Directory ACL */
@@ -211,7 +212,7 @@ struct ext2_dir_entry {
  * The new version of the directory entry.  Since EXT2 structures are
  * stored in intel byte order, and the name_len field could never be
  * bigger than 255 chars, it's safe to reclaim the extra byte for the
- * file_type field.
+ * file_type fiel.d
  */
 struct ext2_dir_entry_2 {
 	unsigned int	inode;			/* Inode number */
