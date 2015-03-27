@@ -100,9 +100,69 @@ void read_metadata(int fd){
     g_info.sb = sb;
 }
 
+/* read all the entries in a block and update the *entries* paremter */
+int read_all_entries_in_a_block(dir_entry_list_t* entries, unsigned int data_block){
+
+    unsigned int offset = data_block * EXT2_BLOCK_SIZE; 
+    lseek(g_info.fd, offset, SEEK_SET);
+
+    char* block = malloc( EXT2_BLOCK_SIZE );
+    /* read a whole block */
+    if( read(g_info.fd, block, EXT2_BLOCK_SIZE) == EXT2_BLOCK_SIZE ){
+	int block_offset = 0;
+	unsigned int read_inode;
+	unsigned short rec_len;
+	unsigned char name_len;
+	unsigned char file_type;	  	    
+
+	while ( block_offset < EXT2_BLOCK_SIZE ) {
+	    unsigned int old = block_offset; 
+	    read_inode = *((unsigned int*) (block + block_offset));
+	    block_offset += sizeof(unsigned int);
+	    rec_len = *((unsigned short*) (block + block_offset));
+	    block_offset += sizeof(unsigned short);
+	    name_len = *((unsigned char*) (block + block_offset));
+	    block_offset += sizeof(unsigned char);
+	    file_type = *((unsigned char*) (block + block_offset));
+	    block_offset += sizeof(unsigned char);
+		
+	    struct ext2_dir_entry * dir_entry = (struct ext2_dir_entry*)malloc(rec_len);	      
+
+	    if(dir_entry){
+		dir_entry->inode = read_inode;
+		dir_entry->rec_len = rec_len;
+		dir_entry->name_len = (unsigned short)name_len;
+		strncpy(dir_entry->name, (block + block_offset), name_len); /* copy the name */
+		(dir_entry->name)[name_len] = '\0';
+	    }       
+#if DEBUG	       
+	    printf("{inode = %u, rec_len = %u, name_len = %u, name = %s}\n",
+		   dir_entry->inode, dir_entry->rec_len, dir_entry->name_len,
+		   dir_entry->name);
+#endif
+
+	    /* add the entry to result */
+	    dir_entry_list_t* new_entry = (dir_entry_list_t*) malloc(sizeof(dir_entry_list_t));
+	    new_entry->e = dir_entry;		
+	    /* if it is new, then simply initialize it */
+	    if( entries == NULL ){
+		entries = (dir_entry_list_t*) malloc(sizeof(dir_entry_list_t));
+		INIT_LIST_HEAD(&(entries->list));		    
+	    }
+
+	    list_add_tail(&(new_entry->list), &(entries->list));
+	    /* free(dir_entry->name); */
+	    /* free(buf3); */
+	    block_offset = old + rec_len;
+	}   /* end of while loop */
+    }
+    return 0; 
+}    
+
+
 /* based from the inode_table_block_addr, read the content from inode */
 dir_entry_list_t* read_inode(int inode_no, int* is_regular_file){
-    int fd = g_info.fd;
+    /* int fd = g_info.fd; */
     unsigned inode_table_address = g_info.inode_table_address;
     int read_size = -1;
     int ret = -1; 
@@ -120,59 +180,7 @@ dir_entry_list_t* read_inode(int inode_no, int* is_regular_file){
 	/* read all the i_bloc's, i.e., data blocks */
 	for (i=0;  inode->i_block[i] != 0 && i < I_BLOCK_MAX; i++ ){   /* i_block needs to non-zero to be valid */ 
 	    unsigned int data_block = inode->i_block[i];
-	    unsigned int offset = data_block * EXT2_BLOCK_SIZE; 
-	    lseek(fd, offset, SEEK_SET);
-
-	    char* block = malloc( EXT2_BLOCK_SIZE );
-	    /* read a whole block */
-	    if( read(fd, block, EXT2_BLOCK_SIZE) == EXT2_BLOCK_SIZE ){
-		int block_offset = 0;
-		unsigned int read_inode;
-		unsigned short rec_len;
-		unsigned char name_len;
-		unsigned char file_type;	  	    
-
-		while ( block_offset < EXT2_BLOCK_SIZE ) {
-		    unsigned int old = block_offset; 
-		    read_inode = *((unsigned int*) (block + block_offset));
-		    block_offset += sizeof(unsigned int);
-		    rec_len = *((unsigned short*) (block + block_offset));
-		    block_offset += sizeof(unsigned short);
-		    name_len = *((unsigned char*) (block + block_offset));
-		    block_offset += sizeof(unsigned char);
-		    file_type = *((unsigned char*) (block + block_offset));
-		    block_offset += sizeof(unsigned char);
-		
-		    struct ext2_dir_entry * dir_entry = (struct ext2_dir_entry*)malloc(rec_len);	      
-
-		    if(dir_entry){
-			dir_entry->inode = read_inode;
-			dir_entry->rec_len = rec_len;
-			dir_entry->name_len = (unsigned short)name_len;
-			strncpy(dir_entry->name, (block + block_offset), name_len); /* copy the name */
-			(dir_entry->name)[name_len] = '\0';
-		    }       
-#if DEBUG	       
-		    printf("{inode = %u, rec_len = %u, name_len = %u, name = %s}\n",
-			   dir_entry->inode, dir_entry->rec_len, dir_entry->name_len,
-			   dir_entry->name);
-#endif
-
-		    /* add the entry to result */
-		    dir_entry_list_t* new_entry = (dir_entry_list_t*) malloc(sizeof(dir_entry_list_t));
-		    new_entry->e = dir_entry;		
-		    /* if it is new, then simply initialize it */
-		    if( entries == NULL ){
-			entries = (dir_entry_list_t*) malloc(sizeof(dir_entry_list_t));
-			INIT_LIST_HEAD(&(entries->list));		    
-		    }
-
-		    list_add_tail(&(new_entry->list), &(entries->list));
-		    /* free(dir_entry->name); */
-		    /* free(buf3); */
-		    block_offset = old + rec_len;
-		}   /* end of while loop */
-	    }
+	    read_all_entries_in_a_block(entries, data_block);
 	    /* free(buf); */
 	}
     }
@@ -381,7 +389,7 @@ struct ext2_inode* create_inode(unsigned int parent_inode){
     int i; 
     struct ext2_inode* new = (struct ext2_inode*) malloc(sizeof(struct ext2_inode));
     /* create a permission like this: -rwxr-xr-x */
-    new->i_mode = 0 |  EXT2_S_IRUS | EXT2_S_IWUSR | EXT2_S_IXUSR |  EXT2_S_IRGRP |
+    new->i_mode = 0 |  EXT2_S_IRUSR | EXT2_S_IWUSR | EXT2_S_IXUSR |  EXT2_S_IRGRP |
 	 EXT2_S_IXGRP | EXT2_S_IROTH |  EXT2_S_IXOTH; 
     new->i_uid = getuid();
     new->i_gid = getgid();
@@ -416,15 +424,19 @@ struct ext2_inode* create_inode(unsigned int parent_inode){
  the i_mode is not fill */
 struct ext2_inode* create_dir_inode(unsigned int parent_inode){
     struct ext2_inode* new = create_inode(parent_inode);
-
     new->i_mode |= EXT2_S_IFDIR; /* update imode */
-    
     return new; 
 }
 
 /* write the inode to the disk */
 int write_inode(unsigned int inode_no, struct ext2_inode* inode){
-
+    unsigned int inode_table_offset = g_info.inode_table_address + (inode_no-1) * EXT2_INODE_SIZE;
+    lseek(g_info.fd, inode_table_offset, SEEK_SET);
+    int write_size = sizeof(struct ext2_inode);
+    if( write(g_info.fd, inode, write_size) != write_size ){
+	printf("Write inode: %d failed. \n", inode_no);
+	return 1;
+    }
     return 0;
 }
 
@@ -432,10 +444,11 @@ struct ext2_dir_entry_2* create_entry(unsigned int inode, char* name){
     unsigned int name_len = strlen(name);
     unsigned short rec_len =  sizeof(struct ext2_dir_entry_2) + name_len;
     struct ext2_dir_entry_2* dirent1 = (struct ext2_dir_entry_2*) malloc(rec_len);
-    dirent1->inode = new_inode_no;
-    dirent2->rec_len = rec_len;
+    dirent1->inode = inode;
+    dirent1->rec_len = rec_len;
     dirent1->name_len = (char) name_len;
-    dirent1->name = name;
+    strncpy (dirent1->name, name, name_len);
+    (dirent1->name)[name_len] = '\0';
     return dirent1; 
 }
 
@@ -468,6 +481,72 @@ int write_new_dir_data_block(unsigned int new_data_block, unsigned int new_inode
 	printf("Failed to write the directory entry 2\n");
 	return 1;
     }
+    return 0;
+}
+
+int write_entries_to_data_block(unsigned int data_block, dir_entry_list_t* entries){
+    int offset = data_block * EXT2_BLOCK_SIZE;
+    seek(g_info.fd, offset, SEEK_SET);
+    dir_entry_list_t* tmp;
+    list_for_each_entry(tmp, &entries->list, list){
+	int write_size = tmp->e->name_len + sizeof(struct ext2_dir_entry_2);
+	if ( write(g_info.fd, tmp->e, write_size) != write_size ){
+	    printf( "Entry write failure.\n" );
+	    return 1; 
+	}
+    }
+
+    return  0;
+}
+
+
+int update_parent_dir(unsigned int parent_inode, unsigned int leaf_node, char* name){
+    int name_len = strlen(name);
+    struct ext2_dir_entry_2* de = create_entry(leaf_node, name);
+    struct ext2_inode* parent = get_inode(parent_inode);
+    int i; 
+    
+    for( i=0; i < EXT2_IBLOCK_COUNT; i++ ){
+	if ( parent->i_block[i] == 0 ) /* the first zero block, meaning the prev block is the last data block */
+	    break;
+    }
+    int data_block = parent->i_block[i-1];    
+    dir_entry_list_t* tmp;
+    dir_entry_list_t* old_entries = NULL;
+
+    assert ( data_block > 0 ); 
+    read_all_entries_in_a_block(old_entries, data_block);
+    int rec_len_total = 0;
+    
+    list_for_each_entry(tmp, &old_entries->list, list){
+	rec_len_total += (tmp->e->name_len) + sizeof(struct ext2_dir_entry_2);
+    }
+
+    dir_entry_list_t* one_entry = (dir_entry_list_t*) malloc(sizeof(dir_entry_list_t));
+    one_entry->e = de; 
+    
+    if ( rec_len_total + de->rec_len > EXT2_BLOCK_SIZE ){
+	/* We need to allocate a new i_block */
+	if ( i >= EXT2_IBLOCK_COUNT - 1 ){
+	    printf("i_blocks limit reached. Can't create a new i_block\n");
+	    exit(1);
+	}
+	/*TODO: Previously allocated inode info has not been updated yet, so this will not return the correct data block. */
+	data_block = allocate_data_block();
+	old_entries = (dir_entry_list_t*) malloc(sizeof(dir_entry_list_t));
+	INIT_LIST_HEAD(&(entries->list));
+
+	de->rec_len = EXT2_BLOCK_SIZE; /* this is the only entry in the block */	
+    }else{			/* it reuses the old block */
+	dir_entry_list_t* tail = entries->list->prev; 
+	/* update the tail */
+	tail->e->rec_len = tail->e->name_len + sizeof(struct ext2_dir_entry_2);
+	/* the rest of the block is yours now */
+	de->rec_len = EXT2_BLOCK_SIZE - rec_len_total; 
+    }
+    /* add the new entry to list */
+    list_add_tail(&(entries->list), &(one_entry->list));
+    write_entries_to_data_block(data_block, old_entries); 		
 
     return 0;
 }

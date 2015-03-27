@@ -64,8 +64,7 @@ void ext2_mkdir(char* path){
     if ( leaf_node == NOT_FOUND && parent_path_exist ){	/* not found the inode */
 	assert (parent_entry_list);
 	assert (parent_inode != NOT_FOUND);
-
-		
+	
 	/* 2 things to determine: 
 	   A. inode number of the new inode, determined by reading the inode bitmap block from group desc
 	   B. data block no. (in which to store '.' and '..' entries, by reading the data bitmap block of the group descriptor */
@@ -82,8 +81,10 @@ void ext2_mkdir(char* path){
 #endif
 	/* write the new inode structure and data blocks into the disk */
 	write_inode(new_inode_no, new_inode); 
-
         write_new_dir_data_block(new_data_block, new_inode_no, parent_inode);
+
+	/* update parent inode */
+	update_parent_dir(parent_inode, new_inode_no, splits[n-1]);
 
 	/* update superblock, free blocks and inodes count
 	   update group descriptor: two bitmaps, free blocks and inodes count, diretory count */    	        
