@@ -30,7 +30,7 @@ ext2_ls: This program takes two command line arguments. The first is the name of
 
 /* ext2 directory entry list */
 typedef struct {
-    struct ext2_dir_entry* e;
+    struct ext2_dir_entry_2* e;
     struct list_head list;
 } dir_entry_list_t;
 
@@ -39,13 +39,14 @@ typedef struct {
     struct ext2_group_desc* egd; 
     struct ext2_super_block* sb; 
     unsigned int inode_table_address;
+    char* inode_bitmap_cached;
+    char* data_bitmap_cached;
 } Path_info;
 
 Path_info g_info;
 void _init_ext2(char*);
 void _exit_ext2();
 void ext2_ls(char* path);
-
 
 void read_metadata(int fd);
 /* init all the path info  */
@@ -98,10 +99,14 @@ void read_metadata(int fd){
     g_info.inode_table_address = (egd->bg_inode_table) * EXT2_BLOCK_SIZE;    
     g_info.egd = egd;
     g_info.sb = sb;
+
+    /* update all cache to NULL */
+    g_info.inode_bitmap_cached = NULL;
+    g_info.data_bitmap_cached = NULL;
 }
 
 /* read all the entries in a block and update the *entries* paremter */
-int read_all_entries_in_a_block(dir_entry_list_t* entries, unsigned int data_block){
+int read_all_entries_in_a_block(dir_entry_list_t** entries, unsigned int data_block){
 
     unsigned int offset = data_block * EXT2_BLOCK_SIZE; 
     lseek(g_info.fd, offset, SEEK_SET);
@@ -126,7 +131,7 @@ int read_all_entries_in_a_block(dir_entry_list_t* entries, unsigned int data_blo
 	    file_type = *((unsigned char*) (block + block_offset));
 	    block_offset += sizeof(unsigned char);
 		
-	    struct ext2_dir_entry * dir_entry = (struct ext2_dir_entry*)malloc(rec_len);	      
+	    struct ext2_dir_entry_2 * dir_entry = (struct ext2_dir_entry_2*)malloc(rec_len);	      
 
 	    if(dir_entry){
 		dir_entry->inode = read_inode;
@@ -145,12 +150,12 @@ int read_all_entries_in_a_block(dir_entry_list_t* entries, unsigned int data_blo
 	    dir_entry_list_t* new_entry = (dir_entry_list_t*) malloc(sizeof(dir_entry_list_t));
 	    new_entry->e = dir_entry;		
 	    /* if it is new, then simply initialize it */
-	    if( entries == NULL ){
-		entries = (dir_entry_list_t*) malloc(sizeof(dir_entry_list_t));
-		INIT_LIST_HEAD(&(entries->list));		    
+	    if( (*entries) == NULL ){
+		(*entries) = (dir_entry_list_t*) malloc(sizeof(dir_entry_list_t));
+		INIT_LIST_HEAD(&((*entries)->list));		    
 	    }
 
-	    list_add_tail(&(new_entry->list), &(entries->list));
+	    list_add_tail(&(new_entry->list), &((*entries)->list));
 	    /* free(dir_entry->name); */
 	    /* free(buf3); */
 	    block_offset = old + rec_len;
@@ -180,7 +185,7 @@ dir_entry_list_t* read_inode(int inode_no, int* is_regular_file){
 	/* read all the i_bloc's, i.e., data blocks */
 	for (i=0;  inode->i_block[i] != 0 && i < I_BLOCK_MAX; i++ ){   /* i_block needs to non-zero to be valid */ 
 	    unsigned int data_block = inode->i_block[i];
-	    read_all_entries_in_a_block(entries, data_block);
+	    read_all_entries_in_a_block(&entries, data_block);
 	    /* free(buf); */
 	}
     }
@@ -325,17 +330,42 @@ int is_zero( unsigned int bits, unsigned int pos) {
 	return 0; 
 }    
 
-
-/* TODO: assuming the unsigned int is 32-bit */
-unsigned int find_free_inode(char* bitmap){
+/* Allocate new inode and update the cached bitmap */
+/* TODO: Assumption: the unsigned int is 32-bit */
+unsigned int _allocate_inode(char* bitmap){
+    if(bitmap){
+	unsigned int found = ERR_RET; 
+	unsigned int mask = 0;
+	int i;
+	for (i = EXT2_GOOD_OLD_FIRST_INO; i < EXT2_MAX_INO; i++){
+	    unsigned int offset = (i / 32) * 4; /* 32 bits is 4 bytes, so the offset is multiple of 4 bytes */
+	    unsigned int* bits = (unsigned int*) (bitmap + offset);
+	    if ( is_zero(*bits, i % 32) ){
+		found = i + 1; 
+		mask = 1 << (i%32); 
+		assert( mask > 0 );	
+		*bits |= mask; /* update the bitmap */
+		break;
+	    }
+	}
+	return found; 
+    }
+    return ERR_RET;
+}
+/* allocate new data block and update the cached bitmap */
+unsigned int _allocate_data_block(char* bitmap){
     if(bitmap){
 	unsigned int found = ERR_RET; 
 	int i;
-	for (i = EXT2_GOOD_OLD_FIRST_INO; i < EXT2_MAX_INO; i++){
-	    unsigned offset = (i / 32) * 4; /* 32 bits is 4 bytes, so the offset is multiple of 4 bytes */
-	    unsigned bits = *((unsigned int*) (bitmap + offset));
-	    if ( is_zero(bits, i % 32) ){
+	unsigned int mask = 0; 
+	for (i = 0; i < EXT2_MAX_BLOCKS; i++){
+	    unsigned int offset = (i / 32) * 4; /* 32 bits is 4 bytes, so the offset is multiple of 4 bytes */
+	    unsigned int* bits = (unsigned int*) (bitmap + offset);
+	    if ( is_zero(*bits, i % 32) ){
 		found = i + 1; 
+		mask = 1 << (i%32); 
+		assert( mask > 0 );	
+		*bits |= mask; /* update the bitmap */		
 		break;
 	    }
 	}
@@ -344,42 +374,100 @@ unsigned int find_free_inode(char* bitmap){
     return ERR_RET;
 }
 
-unsigned int find_free_data_block(char* bitmap){
-    if(bitmap){
-	unsigned int found = ERR_RET; 
-	int i;
-	for (i = 0; i < EXT2_MAX_BLOCKS; i++){
-	    unsigned offset = (i / 32) * 4; /* 32 bits is 4 bytes, so the offset is multiple of 4 bytes */
-	    unsigned bits = *((unsigned int*) (bitmap + offset));
-	    if ( is_zero(bits, i % 32) ){
-		found = i + 1; 
-		break;
-	    }
-	}
-	return found; 
+/* Fetch the inode bitmap from cache
+allocate new bitmap when it is never been fetched before  */
+char* fetch_inode_bitmap(){
+    if ( g_info.inode_bitmap_cached == NULL ){	
+	unsigned int inode_bitmap_block = g_info.egd->bg_inode_bitmap; 
+	g_info.inode_bitmap_cached  = read_block(inode_bitmap_block); 
+	assert ( g_info.inode_bitmap_cached != NULL );
     }
-    return ERR_RET;
+    return g_info.inode_bitmap_cached; 
+}
+
+/* Fetch the data bitmap from cache
+allocate new bitmap when it is never been fetched before  */
+char* fetch_data_bitmap(){
+    if ( g_info.data_bitmap_cached == NULL ){	
+	unsigned int block_bitmap_block = g_info.egd->bg_block_bitmap; 
+	g_info.data_bitmap_cached  = read_block(block_bitmap_block);
+	assert ( g_info.data_bitmap_cached != NULL );
+    }
+    return g_info.data_bitmap_cached; 
 }
 
 /* read group desc struct and allocate a new inode number */
 unsigned int allocate_inode(){
-    unsigned int ret = -1;
-    unsigned int inode_bitmap_block = g_info.egd->bg_inode_bitmap; 
-    char* bitmap = read_block(inode_bitmap_block); 
+    unsigned int ret = ERR_RET;
+    char* bitmap = fetch_inode_bitmap();
     if (bitmap){
-	ret = find_free_inode(bitmap);
+	ret = _allocate_inode(bitmap);
+	assert( ret != ERR_RET );
+	/* update the cached group descriptor */
+	g_info.egd->bg_free_inodes_count -= 1;
+	/* update the cached superblock */
+	g_info.sb->s_free_inodes_count -= 1;
+	
     }
     return ret; 
 }
 
 unsigned int allocate_data_block(){
 
-    unsigned int ret = -1;
-    unsigned int block_bitmap_block = g_info.egd->bg_block_bitmap; 
-    char* bitmap = read_block(block_bitmap_block); 
+    unsigned int ret = ERR_RET;
+    char* bitmap = fetch_data_bitmap();
     if (bitmap){
-	ret = find_free_data_block(bitmap);
+	ret = _allocate_data_block(bitmap);
+	assert( ret != ERR_RET );
+	/* update the accounting */
+	g_info.egd->bg_free_blocks_count -= 1;
+	/* update the cached superblock */
+	g_info.sb->s_free_blocks_count -= 1;
     }
+    return ret; 
+}
+
+int write_bitmap(unsigned int block_no, char* bitmap){
+
+    if(bitmap){
+	unsigned int offset = block_no * EXT2_BLOCK_SIZE; 
+	lseek(g_info.fd, offset, SEEK_SET);
+	int write_size = EXT2_BLOCK_SIZE; 
+	
+	if( write(g_info.fd, bitmap, write_size) != write_size ){
+	    return ERR_RET; 
+	}else
+	    return 0; 
+    }
+    return ERR_RET; 
+}
+
+/* Write the cached group descriptor and superblocks to the disk */ 
+int persist_metadata(){
+    int ret = 0; 
+    /* write the superblock */
+    lseek(g_info.fd, SUPERBLOCK_OFFSET, SEEK_SET);
+    int write_size = sizeof(struct ext2_super_block);
+    if ( write(g_info.fd, g_info.sb, write_size) != write_size ){
+	printf("Persisting superblock failure.\n" );
+	exit(1);
+    }
+
+    /* write the block descriptor */
+    /* TODO: assume the descriptor is right next to the superblock */
+    write_size = sizeof(struct ext2_group_desc);
+    if ( write(g_info.fd, g_info.egd, write_size) != write_size ){
+	printf("Persisting group descriptor failure.\n" );
+	exit(1);
+    }
+
+    /* write the bitmaps */
+    unsigned int inode_bitmap_block = g_info.egd->bg_inode_bitmap; 
+    write_bitmap(inode_bitmap_block, g_info.inode_bitmap_cached);
+
+    unsigned int block_bitmap_block = g_info.egd->bg_block_bitmap; 
+    write_bitmap(block_bitmap_block, g_info.data_bitmap_cached);
+	
     return ret; 
 }
 
@@ -486,7 +574,7 @@ int write_new_dir_data_block(unsigned int new_data_block, unsigned int new_inode
 
 int write_entries_to_data_block(unsigned int data_block, dir_entry_list_t* entries){
     int offset = data_block * EXT2_BLOCK_SIZE;
-    seek(g_info.fd, offset, SEEK_SET);
+    lseek(g_info.fd, offset, SEEK_SET);
     dir_entry_list_t* tmp;
     list_for_each_entry(tmp, &entries->list, list){
 	int write_size = tmp->e->name_len + sizeof(struct ext2_dir_entry_2);
@@ -495,7 +583,6 @@ int write_entries_to_data_block(unsigned int data_block, dir_entry_list_t* entri
 	    return 1; 
 	}
     }
-
     return  0;
 }
 
@@ -515,7 +602,7 @@ int update_parent_dir(unsigned int parent_inode, unsigned int leaf_node, char* n
     dir_entry_list_t* old_entries = NULL;
 
     assert ( data_block > 0 ); 
-    read_all_entries_in_a_block(old_entries, data_block);
+    read_all_entries_in_a_block(&old_entries, data_block);
     int rec_len_total = 0;
     
     list_for_each_entry(tmp, &old_entries->list, list){
@@ -534,18 +621,18 @@ int update_parent_dir(unsigned int parent_inode, unsigned int leaf_node, char* n
 	/*TODO: Previously allocated inode info has not been updated yet, so this will not return the correct data block. */
 	data_block = allocate_data_block();
 	old_entries = (dir_entry_list_t*) malloc(sizeof(dir_entry_list_t));
-	INIT_LIST_HEAD(&(entries->list));
+	INIT_LIST_HEAD(&(old_entries->list));
 
 	de->rec_len = EXT2_BLOCK_SIZE; /* this is the only entry in the block */	
     }else{			/* it reuses the old block */
-	dir_entry_list_t* tail = entries->list->prev; 
+	dir_entry_list_t* tail = list_entry(old_entries->list.prev, dir_entry_list_t, list);
 	/* update the tail */
 	tail->e->rec_len = tail->e->name_len + sizeof(struct ext2_dir_entry_2);
 	/* the rest of the block is yours now */
 	de->rec_len = EXT2_BLOCK_SIZE - rec_len_total; 
     }
     /* add the new entry to list */
-    list_add_tail(&(entries->list), &(one_entry->list));
+    list_add_tail(&(old_entries->list), &(one_entry->list));
     write_entries_to_data_block(data_block, old_entries); 		
 
     return 0;

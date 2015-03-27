@@ -86,8 +86,10 @@ void ext2_mkdir(char* path){
 	/* update parent inode */
 	update_parent_dir(parent_inode, new_inode_no, splits[n-1]);
 
-	/* update superblock, free blocks and inodes count
-	   update group descriptor: two bitmaps, free blocks and inodes count, diretory count */    	        
+	/* TODO: update superblock, free blocks and inodes count
+	   update group descriptor: two bitmaps, free blocks and inodes count, diretory count */  
+	persist_metadata();
+	
     }else{
 
 	if (leaf_node != NOT_FOUND){	/* found the inode */
