@@ -19,6 +19,9 @@ ext2_ls: This program takes two command line arguments. The first is the name of
 #include "utils.h"
 #include <sys/types.h>
 #include <sys/time.h>
+#include <errno.h>
+#include <string.h>
+
 
 #define SUPERBLOCK_OFFSET 1024
 #define EXT2_INODE_SIZE sizeof(struct ext2_inode)
@@ -52,7 +55,7 @@ void read_metadata(int fd);
 /* init all the path info  */
 void _init_ext2(char* disk_img)
 {
-    g_info.fd = open(disk_img, O_RDONLY);
+    g_info.fd = open(disk_img, O_RDWR);
     read_metadata(g_info.fd);
 }
 
@@ -521,8 +524,10 @@ int write_inode(unsigned int inode_no, struct ext2_inode* inode){
     unsigned int inode_table_offset = g_info.inode_table_address + (inode_no-1) * EXT2_INODE_SIZE;
     lseek(g_info.fd, inode_table_offset, SEEK_SET);
     int write_size = sizeof(struct ext2_inode);
-    if( write(g_info.fd, inode, write_size) != write_size ){
+    int ret = write(g_info.fd, (char*)inode, write_size) ;
+    if( ret != write_size ){
 	printf("Write inode: %d failed. \n", inode_no);
+	printf("Error number: %s\n", strerror(errno));
 	return 1;
     }
     return 0;

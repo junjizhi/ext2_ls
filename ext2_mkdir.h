@@ -6,13 +6,14 @@ void ext2_mkdir(char* path){
     int n = -1;
     int is_regular_file;
     int leaf_node = NOT_FOUND;
-    int parent_inode = NOT_FOUND; 
+    
     int i; 
 
-    dir_entry_list_t* parent_entry_list = NULL;
-
      /* read root dir */
-    dir_entry_list_t*  current_entry_list = read_root_entry_list();
+    dir_entry_list_t* current_entry_list = read_root_entry_list();
+    dir_entry_list_t* prev = current_entry_list; 
+    dir_entry_list_t* parent_entry_list = current_entry_list; 
+    int parent_inode = 2; 	/* start from root inode */
 
     /* split the path into n splits */
     char** splits = str_split(path, '/', &n);
@@ -29,36 +30,46 @@ void ext2_mkdir(char* path){
 		found_inode = tmp->e->inode;
 		is_regular_file = 0 ;
 		/* found, then update the current entry list*/
-		dir_entry_list_t* tmp2 = read_inode(found_inode, &is_regular_file);	     
-	    /* if it is a regular file, then */
-		if( tmp == NULL ){		    
+		prev = current_entry_list; 
+		current_entry_list = read_inode(found_inode, &is_regular_file);	     
+		if( current_entry_list == NULL ){		    
 		    assert(is_regular_file); /* invalid combination */
-		    /* found_inode = -1; */
-		}else{
-		    current_entry_list = tmp2;
-		}		  
-		break;
+		}
+		break;		/* exit the entry list loop */
 	    }
+	}
+	
+	/* if the path is found */
+	if (found_inode != NOT_FOUND && i == (n-1) ) {
+	    leaf_node = found_inode; 
+	    break;		/* break the for loop */
 	}
 
-	if ( found_inode == NOT_FOUND ){		
-	    if(i != (n-1)){	/* not reaching the end. Some parent directories  */
-		parent_path_exist = 0;
-	    /* TODO: free resources, too */
-		current_entry_list = NULL;
-	    }
-	    else		/* NOT FOUND and it is not the leaf, meaning the parent path does not exist */
-		parent_path_exist = 1;
+	/* if path does not exists, and it is not the end of list yet  */
+	if (found_inode == NOT_FOUND && i != (n-1) ) {
+	    parent_path_exist = 0;
 	    break;
-	}else{ 			/* if found */
-	    if ( i == (n-2) ){	/* the intermediat parent directory */
-		parent_inode = found_inode;
-		parent_entry_list = current_entry_list;
-	    }
-	    if ( i == (n-1) ){	/* the intermediat parent directory */
-		leaf_node = found_inode;
-	    }
 	}
+
+	/* if path is found, but one of its dir is a file */
+	/* TODO: maybe there are better logic here */
+	if (found_inode != NOT_FOUND && is_regular_file ){
+	    parent_path_exist = 0;
+	    break;
+	}
+
+	/* if path does not exists, and it is the end of list, then it means
+	 it is okay to create a new inode*/
+	if (found_inode == NOT_FOUND && i == (n-1) ) {
+	    leaf_node = NOT_FOUND;
+	    parent_path_exist = 1; 
+	    parent_entry_list = prev; 
+	    break;
+	}
+	
+	/* when the code reaches here, then it is safe to update parent inode */
+	if (found_inode != NOT_FOUND)
+	    parent_inode = found_inode; 
     }
 
     if ( leaf_node == NOT_FOUND && parent_path_exist ){	/* not found the inode */
