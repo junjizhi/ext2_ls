@@ -623,7 +623,7 @@ int update_parent_dir(unsigned int parent_inode, unsigned int leaf_node, char* n
 	    printf("i_blocks limit reached. Can't create a new i_block\n");
 	    exit(1);
 	}
-	/*TODO: Previously allocated inode info has not been updated yet, so this will not return the correct data block. */
+
 	data_block = allocate_data_block();
 	old_entries = (dir_entry_list_t*) malloc(sizeof(dir_entry_list_t));
 	INIT_LIST_HEAD(&(old_entries->list));
@@ -637,7 +637,7 @@ int update_parent_dir(unsigned int parent_inode, unsigned int leaf_node, char* n
 	de->rec_len = EXT2_BLOCK_SIZE - rec_len_total; 
     }
     /* add the new entry to list */
-    list_add_tail(&(old_entries->list), &(one_entry->list));
+    list_add_tail(&(one_entry->list), &(old_entries->list));
     write_entries_to_data_block(data_block, old_entries); 		
 
     return 0;
