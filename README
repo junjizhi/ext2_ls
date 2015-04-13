@@ -2,6 +2,19 @@
 A simplified version of ls and mkdir implementation on ext2 file system. 
 
 # Assumptions
+There are assumptions about the size of disk image. Please refer to: http://www.cdf.toronto.edu/~csc369h/winter/assignments/a3/a3.html
+For convenience, there is an generated disk image that in img/ folder. 
+
+# Usage
+ext2_ls <disk image> <path on disk>
+
+Example:
+$ ./ext2_ls img/onedirectory.img /level1
+drwxr-xr-x@ 2 root root 1024 1427146420 .
+drwxr-xr-x@ 4 root root 1024 1427145880 ..
+-rw-r--r--@ 1 root root 0 1427146419 new
+-rw-r--r--@ 1 root root 128 1426429007 bfile
+
 
 # Notes
 0. The program only works in 64bit machine. It assumes the int type is 32bit. 
@@ -12,7 +25,13 @@ A simplified version of ls and mkdir implementation on ext2 file system.
 missing free() on the malloc'd pointers. 
 4. ext2_mkdir only takes for absolute path as the parameters. 
 
+# Known issues
+1. The root path does not work well. 
+2. The ls printout is not formatted as the standard ls command. 
+
 # Credits
 1. The implementation is mostly developed from an Operating System
-Course assignment. The instructor Karen Raid designed the assignment and wrote a
+Course assignment: http://www.cdf.toronto.edu/~csc369h/winter/assignments/a3/a3.html. 
+The instructor Karen Raid designed the assignment and wrote a
 detailed helpful specificiation for this program. 
+2. list.h is copied from Kulesh Shanmugasundaram's site: http://isis.poly.edu/kulesh/stuff/src/klist/ Kulesh deserves all the credits for posting the explanation and the adapted source code.

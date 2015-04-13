@@ -29,7 +29,7 @@ ext2_ls: This program takes two command line arguments. The first is the name of
 #define IMODE_TYPE_MASK 0xF000
 #define MAX_REC_LEN 980
 
-#define DEBUG 1
+#define DEBUG 0
 
 /* ext2 directory entry list */
 typedef struct {
