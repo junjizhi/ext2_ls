@@ -1,11 +1,14 @@
-# Introduction
-A simplified version of ls and mkdir implementation on ext2 file system. 
+Introduction
+------------
+A simplified version of ls implementation on ext2 file system. 
 
-# Assumptions
+Assumptions
+------------
 There are assumptions about the size of disk image. Please refer to: http://www.cdf.toronto.edu/~csc369h/winter/assignments/a3/a3.html
-For convenience, there is an generated disk image that in img/ folder. 
+For convenience, there is an generated disk image in img/ folder. 
 
-# Usage
+Usage
+------------
 ext2_ls <disk image> <path on disk>
 
 Example:
@@ -15,8 +18,8 @@ drwxr-xr-x@ 4 root root 1024 1427145880 ..
 -rw-r--r--@ 1 root root 0 1427146419 new
 -rw-r--r--@ 1 root root 128 1426429007 bfile
 
-
-# Notes
+Notes
+------------
 0. The program only works in 64bit machine. It assumes the int type is 32bit. 
 1. The print out of *ext2_ls* is not as nicely formatted as an usual
 *ls* does. It needs work on *print_file* function.
@@ -24,13 +27,12 @@ drwxr-xr-x@ 4 root root 1024 1427145880 ..
 3. There might be memory leak problems in the program. Probably due to
 missing free() on the malloc'd pointers. 
 4. ext2_mkdir only takes for absolute path as the parameters. 
+5. Passing the root path "/" does not work well, but passing the second level path, e.g., "/level1" is fine. 
+6. The ls output is not formatted as the standard ls command. There are small alignment differences. 
+7. ext2_mkdir does NOT work for now. Running ext2_mkdir WILL RUIN THE DISK IMAGE. Test it with cautions!
 
-# Known issues
-1. The root path does not work well. 
-2. The ls printout is not formatted as the standard ls command. 
-3. ext2_mkdir does NOT work well for now. Running ext2_mkdir WILL RUIN THE DISK IMAGE. Test it with cautions!
-
-# Credits
+Credits
+------------
 1. The implementation is mostly developed from an Operating System
 Course assignment: http://www.cdf.toronto.edu/~csc369h/winter/assignments/a3/a3.html. 
 The instructor Karen Raid designed the assignment and wrote a
