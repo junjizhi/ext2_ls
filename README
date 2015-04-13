@@ -28,6 +28,7 @@ missing free() on the malloc'd pointers.
 # Known issues
 1. The root path does not work well. 
 2. The ls printout is not formatted as the standard ls command. 
+3. ext2_mkdir does NOT work well for now. Running ext2_mkdir WILL RUIN THE DISK IMAGE. Test it with cautions!
 
 # Credits
 1. The implementation is mostly developed from an Operating System
